@@ -1,1 +1,5 @@
 .github/workflows/sec_plan.yaml
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
