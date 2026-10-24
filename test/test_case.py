@@ -1,11 +1,11 @@
-import threading
-import urllib.request
-import pytest
 import importlib.util
 import os
 import sys
+import threading
+import urllib.request
 from http.server import HTTPServer
 
+import pytest
 
 # current_dir is the 'test/' directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
