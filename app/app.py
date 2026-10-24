@@ -1,7 +1,7 @@
-import time
 import logging
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # Configure logging to output to stdout
