@@ -41,32 +41,16 @@ jobs:
 
           pip install pytest ruff pip-audit
 
-      # -----------------------------
-      # CODE QUALITY
-      # -----------------------------
-
       - name: Run Ruff
         run: ruff check .
 
-      # -----------------------------
-      # UNIT TESTS
-      # -----------------------------
-
       - name: Run tests
         run: pytest -q
-
-      # -----------------------------
-      # SECRET SCANNING
-      # -----------------------------
 
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # -----------------------------
-      # SAST
-      # -----------------------------
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -76,25 +60,13 @@ jobs:
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
 
-      # -----------------------------
-      # DEPENDENCY SECURITY
-      # -----------------------------
-
       - name: Run pip-audit
         run: pip-audit
-
-      # -----------------------------
-      # CONTAINER BUILD
-      # -----------------------------
 
       - name: Build Docker image
         run: |
           docker build \
             --tag devops-sre:${{ github.sha }} .
-
-      # -----------------------------
-      # CONTAINER SECURITY
-      # -----------------------------
 
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@0.28.0
@@ -105,11 +77,6 @@ jobs:
           ignore-unfixed: true
           vuln-type: os,library
           severity: HIGH,CRITICAL
-
-      # -----------------------------
-      # CREATE PR ONLY AFTER ALL
-      # SECURITY GATES PASS
-      # -----------------------------
 
       - name: Create Pull Request
         if: success()
