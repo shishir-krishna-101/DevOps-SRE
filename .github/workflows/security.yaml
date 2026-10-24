@@ -1,0 +1,128 @@
+name: Feature Security Gate
+
+on:
+  push:
+    branches:
+      - "feature/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+concurrency:
+  group: feature-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    name: Security Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+          pip install pytest ruff pip-audit
+
+      # -----------------------------
+      # CODE QUALITY
+      # -----------------------------
+
+      - name: Run Ruff
+        run: ruff check .
+
+      # -----------------------------
+      # UNIT TESTS
+      # -----------------------------
+
+      - name: Run tests
+        run: pytest -q
+
+      # -----------------------------
+      # SECRET SCANNING
+      # -----------------------------
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------
+      # SAST
+      # -----------------------------
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+
+      # -----------------------------
+      # DEPENDENCY SECURITY
+      # -----------------------------
+
+      - name: Run pip-audit
+        run: pip-audit
+
+      # -----------------------------
+      # CONTAINER BUILD
+      # -----------------------------
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag devops-sre:${{ github.sha }} .
+
+      # -----------------------------
+      # CONTAINER SECURITY
+      # -----------------------------
+
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: devops-sre:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+
+      # -----------------------------
+      # CREATE PR ONLY AFTER ALL
+      # SECURITY GATES PASS
+      # -----------------------------
+
+      - name: Create Pull Request
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          if gh pr view "$BRANCH_NAME" --base main >/dev/null 2>&1; then
+            echo "Pull request already exists."
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "Security-approved: $BRANCH_NAME" \
+              --body "Automatically created after all security and quality gates passed."
+          fi
