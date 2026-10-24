@@ -1,4 +1,4 @@
-.github/workflows
+.github/workflows/sec_plan.yaml
 test\__pycache__
 app\__pycache__
 .ruff_cache
