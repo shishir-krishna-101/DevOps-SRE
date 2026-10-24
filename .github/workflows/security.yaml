@@ -69,7 +69,7 @@ jobs:
             --tag devops-sre:${{ github.sha }} .
 
       - name: Scan Docker image with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: devops-sre:${{ github.sha }}
           format: table
