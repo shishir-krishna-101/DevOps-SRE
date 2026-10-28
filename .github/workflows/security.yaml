@@ -62,6 +62,12 @@ jobs:
         run: |
           docker build \
             --tag devops-sre:${{ github.sha }} .
+          
+      - name: Verify container dependencies
+        run: |
+         docker run --rm devops-sre:${{ github.sha }} \
+         python -m pip show msgpack setuptools urllib3
+
 
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
