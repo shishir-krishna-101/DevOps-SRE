@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
   packages: write
 
 concurrency:
@@ -18,18 +19,21 @@ concurrency:
 jobs:
   release:
     name: Build and Release
-    if: github.event.pull_request.merged == true
+    if: >-
+      github.event.pull_request.merged == true &&
+      !startsWith(github.event.pull_request.head.ref, 'gitops/update-image-')
     runs-on: ubuntu-latest
 
     env:
       IMAGE_NAME: ghcr.io/shishir-krishna-101/devops-sre
       IMAGE_TAG: ${{ github.event.pull_request.merge_commit_sha }}
+      GITOPS_BRANCH: gitops/update-image-${{ github.event.pull_request.merge_commit_sha }}
 
     steps:
       - name: Checkout merged commit
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
 
       - name: Log in to GHCR
@@ -65,6 +69,10 @@ jobs:
         run: |
           docker push "$IMAGE_NAME:$IMAGE_TAG"
 
+      - name: Create GitOps branch
+        run: |
+          git switch -c "$GITOPS_BRANCH"
+
       - name: Update Kubernetes image tag
         run: |
           sed -i \
@@ -75,7 +83,7 @@ jobs:
         run: |
           grep "image:" k8s/deployment.yaml
 
-      - name: Commit Kubernetes manifest
+      - name: Commit GitOps manifest change
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -84,7 +92,29 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No manifest changes."
-          else
-            git commit -m "chore: update image to $IMAGE_TAG"
-            git push origin main
+            exit 0
           fi
+
+          git commit -m "chore: update image to $IMAGE_TAG"
+
+      - name: Push GitOps branch
+        run: |
+          git push --set-upstream origin "$GITOPS_BRANCH"
+
+      - name: Create GitOps Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head "$GITOPS_BRANCH" \
+            --title "chore: deploy $IMAGE_TAG" \
+            --body "## GitOps Deployment Update
+
+This PR updates the Kubernetes Deployment image to:
+
+\`$IMAGE_NAME:$IMAGE_TAG\`
+
+The image was built, dependency-verified, and passed the final Trivy HIGH/CRITICAL vulnerability gate before this PR was created.
+
+Once merged, ArgoCD can reconcile the updated manifest from Git."
