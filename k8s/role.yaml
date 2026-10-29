@@ -1,0 +1,21 @@
+# The app does not call the Kubernetes API, therefore it receives no API permissions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: devops-sre-no-api-access
+  namespace: devops-sre
+rules: []
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: devops-sre-no-api-access
+  namespace: devops-sre
+subjects:
+  - kind: ServiceAccount
+    name: devops-sre
+    namespace: devops-sre
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: devops-sre-no-api-access
