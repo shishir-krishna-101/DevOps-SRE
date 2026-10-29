@@ -1,4 +1,4 @@
-# The app does not call the Kubernetes API, therefore it receives no API permissions.
+# The app does not call the Kubernetes API, so it is granted no API permissions.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
