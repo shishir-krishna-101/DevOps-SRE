@@ -1,36 +1,36 @@
+# Legacy single-deployment manifest retained for reference only.
+# Argo CD now uses k8s/kustomization.yaml, which includes deployment-v1/2/3.yaml.
 apiVersion: apps/v1
 kind: Deployment
-
 metadata:
-  name: devops-sre
+  name: devops-sre-legacy
+  namespace: devops-sre
   labels:
-    app: devops-sre
-
+    app.kubernetes.io/name: devops-sre-legacy
 spec:
-  replicas: 2
-
+  replicas: 1
   selector:
     matchLabels:
-      app: devops-sre
-
+      app.kubernetes.io/name: devops-sre-legacy
   template:
     metadata:
       labels:
-        app: devops-sre
-
+        app.kubernetes.io/name: devops-sre-legacy
     spec:
       containers:
         - name: devops-sre
           image: ghcr.io/shishir-krishna-101/devops-sre:397e332301c9f6073b609cd1fe3b3a76fa409bac
-
           ports:
-            - containerPort: 80
-
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
           resources:
             requests:
               cpu: 100m
               memory: 128Mi
-
             limits:
               cpu: 500m
-              memory: 512Mi
+              memory: 400Mi
