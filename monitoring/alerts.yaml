@@ -1,0 +1,31 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: devops-sre-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: devops-sre.availability
+      rules:
+        - alert: DevOpsSRENoReadyReplicas
+          expr: |
+            sum(kube_deployment_status_replicas_ready{namespace="devops-sre", deployment=~"devops-sre-v[123]"}) < 3
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "One or more DevOps-SRE deployments are not ready"
+            description: "Fewer than three app replicas are ready. Check pod state and rollout events."
+        - alert: DevOpsSREContainerOOMKilled
+          expr: |
+            sum by (namespace, pod, container) (
+              kube_pod_container_status_last_terminated_reason{namespace="devops-sre", reason="OOMKilled"}
+            ) > 0
+          for: 0m
+          labels:
+            severity: critical
+          annotations:
+            summary: "DevOps-SRE container was OOMKilled"
+            description: "A DevOps-SRE container's last termination reason is OOMKilled. Inspect pod events and memory limits."
