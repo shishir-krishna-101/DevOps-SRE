@@ -65,39 +65,64 @@ jobs:
         run: |
           git switch -c "$GITOPS_BRANCH"
 
-          # Get only the image belonging to the devops-sre application container.
+          # Get only the image of the devops-sre application container.
           get_app_image() {
-            sed -n '
-              /^[[:space:]]*- name: devops-sre$/,/^[[:space:]]*image:/ {
-                /^[[:space:]]*image:/ {
-                  s/^[[:space:]]*image:[[:space:]]*//
-                  p
-                  q
-                }
+            awk '
+              /^[[:space:]]*- name: devops-sre[[:space:]]*$/ {
+                in_app_container=1
+                next
+              }
+
+              in_app_container && /^[[:space:]]*image:/ {
+                sub(/^[[:space:]]*image:[[:space:]]*/, "")
+                print
+                exit
+              }
+
+              in_app_container && /^[[:space:]]*- name:/ {
+                exit
               }
             ' "$1"
           }
 
-          # Update only the image belonging to the devops-sre application container.
+          # Update ONLY the image belonging to the devops-sre container.
           set_app_image() {
             file="$1"
             new_image="$2"
 
-            sed -i "
-              /^[[:space:]]*- name: devops-sre$/,/^[[:space:]]*image:/ {
-                /^[[:space:]]*image:/ {
-                  s|^[[:space:]]*image:.*|          image: $new_image|
-                }
+            awk -v new_image="$new_image" '
+              /^[[:space:]]*- name: devops-sre[[:space:]]*$/ {
+                in_app_container=1
+                print
+                next
               }
-            " "$file"
+
+              in_app_container && /^[[:space:]]*image:/ {
+                match($0, /^[[:space:]]*/)
+                indentation=substr($0, RSTART, RLENGTH)
+                print indentation "image: " new_image
+                in_app_container=0
+                next
+              }
+
+              in_app_container && /^[[:space:]]*- name:/ {
+                in_app_container=0
+              }
+
+              {
+                print
+              }
+            ' "$file" > "$file.tmp"
+
+            mv "$file.tmp" "$file"
           }
 
-          # Read all current application images BEFORE changing anything.
+          # Read the CURRENT application images BEFORE changing anything.
           LATEST_IMAGE=$(get_app_image k8s/deployment_latest.yaml)
           PREVIOUS_IMAGE=$(get_app_image k8s/deployment_previous.yaml)
           OLD_IMAGE=$(get_app_image k8s/deployment_old.yaml)
 
-          # Validate that the application images were found.
+          # Fail if any application image cannot be found.
           if [ -z "$LATEST_IMAGE" ]; then
             echo "ERROR: Could not find devops-sre image in deployment_latest.yaml"
             exit 1
@@ -123,10 +148,12 @@ jobs:
           echo "old      : $OLD_IMAGE"
           echo "new      : $NEW_IMAGE"
 
-          # Rotate:
+          # Rotate ONLY application images:
+          #
           # old      <- previous
           # previous <- latest
           # latest   <- new
+          #
 
           set_app_image k8s/deployment_old.yaml "$PREVIOUS_IMAGE"
           set_app_image k8s/deployment_previous.yaml "$LATEST_IMAGE"
@@ -142,14 +169,14 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo "VERIFY ALL IMAGE REFERENCES"
+          echo "VERIFY YAML IMAGES"
           echo "========================================"
 
-          grep "image:" \
+          grep -n "image:" \
             k8s/deployment_latest.yaml \
             k8s/deployment_previous.yaml \
             k8s/deployment_old.yaml
-
+            
       - name: Commit and push GitOps branch
         run: |
           git config user.name "github-actions[bot]"
