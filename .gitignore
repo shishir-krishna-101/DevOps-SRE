@@ -3,5 +3,6 @@ __pycache__/
 *.py[cod]
 .ruff_cache/
 .pytest_cache/
-argocd/readme.md
 argocd/*
+scripts/deploy-local.sh
+monitoring/*
