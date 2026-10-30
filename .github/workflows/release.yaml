@@ -64,8 +64,30 @@ jobs:
       - name: Update Kubernetes manifest
         run: |
           git switch -c "$GITOPS_BRANCH"
-          sed -i "s|^[[:space:]]*image:.*|          image: $IMAGE_NAME:$IMAGE_TAG|" k8s/deployment.yaml
-          grep "image:" k8s/deployment.yaml
+
+          # Read the currently deployed images before making any changes.
+          LATEST_IMAGE=$(grep -m1 '^[[:space:]]*image:' k8s/deployment_latest.yaml | awk '{print $2}')
+          PREVIOUS_IMAGE=$(grep -m1 '^[[:space:]]*image:' k8s/deployment_previous.yaml | awk '{print $2}')
+
+          echo "Current image rotation:"
+          echo "latest   : $LATEST_IMAGE"
+          echo "previous : $PREVIOUS_IMAGE"
+          echo "old      : $(grep -m1 '^[[:space:]]*image:' k8s/deployment_old.yaml | awk '{print $2}')"
+          sed -i "s|^[[:space:]]*image:.*|          image: $PREVIOUS_IMAGE|" \
+          k8s/deployment_old.yaml
+
+          sed -i "s|^[[:space:]]*image:.*|          image: $LATEST_IMAGE|" \
+            k8s/deployment_previous.yaml
+
+          sed -i "s|^[[:space:]]*image:.*|          image: $IMAGE_NAME:$IMAGE_TAG|" \
+            k8s/deployment_latest.yaml
+
+          echo ""
+          echo "New image rotation:"
+          grep "image:" \
+            k8s/deployment_latest.yaml \
+            k8s/deployment_previous.yaml \
+            k8s/deployment_old.yaml
 
       - name: Commit and push GitOps branch
         run: |
