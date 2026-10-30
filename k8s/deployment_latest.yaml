@@ -43,7 +43,7 @@ spec:
               memory: 16Mi
       containers:
         - name: devops-sre
-          image: ghcr.io/shishir-krishna-101/devops-sre:351b478ef9575977b17b63f1bc386a360231de1a
+          image: ghcr.io/shishir-krishna-101/devops-sre:af4bdaefa1069e842cd5c6164284aa062bd206f1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
