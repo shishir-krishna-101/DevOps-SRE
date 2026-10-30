@@ -61,29 +61,90 @@ jobs:
       - name: Push image
         run: docker push "$IMAGE_NAME:$IMAGE_TAG"
 
-      - name: Update Kubernetes manifest
+      - name: Update Kubernetes manifests
         run: |
           git switch -c "$GITOPS_BRANCH"
 
-          # Read the currently deployed images before making any changes.
-          LATEST_IMAGE=$(grep -m1 '^[[:space:]]*image: g' k8s/deployment_latest.yaml | awk '{print $2}')
-          PREVIOUS_IMAGE=$(grep -m1 '^[[:space:]]*image: g' k8s/deployment_previous.yaml | awk '{print $2}')
+          # Get only the image belonging to the devops-sre application container.
+          get_app_image() {
+            sed -n '
+              /^[[:space:]]*- name: devops-sre$/,/^[[:space:]]*image:/ {
+                /^[[:space:]]*image:/ {
+                  s/^[[:space:]]*image:[[:space:]]*//
+                  p
+                  q
+                }
+              }
+            ' "$1"
+          }
 
-          echo "Current image rotation:"
+          # Update only the image belonging to the devops-sre application container.
+          set_app_image() {
+            file="$1"
+            new_image="$2"
+
+            sed -i "
+              /^[[:space:]]*- name: devops-sre$/,/^[[:space:]]*image:/ {
+                /^[[:space:]]*image:/ {
+                  s|^[[:space:]]*image:.*|          image: $new_image|
+                }
+              }
+            " "$file"
+          }
+
+          # Read all current application images BEFORE changing anything.
+          LATEST_IMAGE=$(get_app_image k8s/deployment_latest.yaml)
+          PREVIOUS_IMAGE=$(get_app_image k8s/deployment_previous.yaml)
+          OLD_IMAGE=$(get_app_image k8s/deployment_old.yaml)
+
+          # Validate that the application images were found.
+          if [ -z "$LATEST_IMAGE" ]; then
+            echo "ERROR: Could not find devops-sre image in deployment_latest.yaml"
+            exit 1
+          fi
+
+          if [ -z "$PREVIOUS_IMAGE" ]; then
+            echo "ERROR: Could not find devops-sre image in deployment_previous.yaml"
+            exit 1
+          fi
+
+          if [ -z "$OLD_IMAGE" ]; then
+            echo "ERROR: Could not find devops-sre image in deployment_old.yaml"
+            exit 1
+          fi
+
+          NEW_IMAGE="$IMAGE_NAME:$IMAGE_TAG"
+
+          echo "========================================"
+          echo "CURRENT IMAGE ROTATION"
+          echo "========================================"
           echo "latest   : $LATEST_IMAGE"
           echo "previous : $PREVIOUS_IMAGE"
-          echo "old      : $(grep -m1 '^[[:space:]]*image: g' k8s/deployment_old.yaml | awk '{print $2}')"
-          sed -i "s|^[[:space:]]*image:.*|          image: $PREVIOUS_IMAGE|" \
-          k8s/deployment_old.yaml
+          echo "old      : $OLD_IMAGE"
+          echo "new      : $NEW_IMAGE"
 
-          sed -i "s|^[[:space:]]*image:.*|          image: $LATEST_IMAGE|" \
-            k8s/deployment_previous.yaml
+          # Rotate:
+          # old      <- previous
+          # previous <- latest
+          # latest   <- new
 
-          sed -i "s|^[[:space:]]*image:.*|          image: $IMAGE_NAME:$IMAGE_TAG|" \
-            k8s/deployment_latest.yaml
+          set_app_image k8s/deployment_old.yaml "$PREVIOUS_IMAGE"
+          set_app_image k8s/deployment_previous.yaml "$LATEST_IMAGE"
+          set_app_image k8s/deployment_latest.yaml "$NEW_IMAGE"
 
           echo ""
-          echo "New image rotation:"
+          echo "========================================"
+          echo "NEW IMAGE ROTATION"
+          echo "========================================"
+          echo "latest   : $(get_app_image k8s/deployment_latest.yaml)"
+          echo "previous : $(get_app_image k8s/deployment_previous.yaml)"
+          echo "old      : $(get_app_image k8s/deployment_old.yaml)"
+
+          echo ""
+          echo "========================================"
+          echo "VERIFY ALL IMAGE REFERENCES"
+          echo "========================================"
+
           grep "image:" \
             k8s/deployment_latest.yaml \
             k8s/deployment_previous.yaml \
@@ -93,11 +154,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git add \
             k8s/deployment_latest.yaml \
             k8s/deployment_previous.yaml \
             k8s/deployment_old.yaml
-          git commit -m "rotating image to $IMAGE_TAG"
+
+          git commit -m "chore: rotate deployment images to $IMAGE_TAG"
+
           git push -u origin "$GITOPS_BRANCH"
 
       - name: Create GitOps pull request
@@ -108,4 +172,4 @@ jobs:
             --base main \
             --head "$GITOPS_BRANCH" \
             --title "chore: rotate deployment images to $IMAGE_TAG" \
-            --body "Rotates the application container images across the three deployment manifests. The new image is $IMAGE_NAME:$IMAGE_TAG. The latest image moves to previous, and the previous image moves to old. The new image passed the final Trivy HIGH/CRITICAL scan. Merge this PR to let Argo CD reconcile the updated desired state."
+            --body "Rotates the application container images. The new image becomes latest, the previous latest moves to previous, and the previous image moves to old. New image: $IMAGE_NAME:$IMAGE_TAG. The image passed the final Trivy HIGH/CRITICAL scan. Merge this GitOps PR to let Argo CD reconcile the updated desired state."
