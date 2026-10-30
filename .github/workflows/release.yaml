@@ -93,8 +93,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/deployment.yaml
-          git commit -m "update image to $IMAGE_TAG"
+          git add \
+            k8s/deployment_latest.yaml \
+            k8s/deployment_previous.yaml \
+            k8s/deployment_old.yaml
+          git commit -m "rotating image to $IMAGE_TAG"
           git push -u origin "$GITOPS_BRANCH"
 
       - name: Create GitOps pull request
@@ -104,5 +107,9 @@ jobs:
           gh pr create \
             --base main \
             --head "$GITOPS_BRANCH" \
-            --title "chore: deploy $IMAGE_TAG" \
-            --body "Updates k8s/deployment.yaml to $IMAGE_NAME:$IMAGE_TAG. The image passed the final Trivy HIGH/CRITICAL scan. Merge this PR to let ArgoCD reconcile the new image."
+            --title "Image: rotate deployment images to $IMAGE_TAG" \
+            --body "Rotates the Kubernetes deployment images:
+            
+            - latest: $IMAGE_NAME:$IMAGE_TAG
+            - previous: $LATEST_IMAGE
+            - old: $PREVIOUS_IMAGE
