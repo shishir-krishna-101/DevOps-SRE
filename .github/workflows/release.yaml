@@ -107,9 +107,5 @@ jobs:
           gh pr create \
             --base main \
             --head "$GITOPS_BRANCH" \
-            --title "Image: rotate deployment images to $IMAGE_TAG" \
-            --body "Rotates the Kubernetes deployment images:
-            
-            - latest: $IMAGE_NAME:$IMAGE_TAG
-            - previous: $LATEST_IMAGE
-            - old: $PREVIOUS_IMAGE
+            --title "chore: rotate deployment images to $IMAGE_TAG" \
+            --body "Rotates the application container images across the three deployment manifests. The new image is $IMAGE_NAME:$IMAGE_TAG. The latest image moves to previous, and the previous image moves to old. The new image passed the final Trivy HIGH/CRITICAL scan. Merge this PR to let Argo CD reconcile the updated desired state."
