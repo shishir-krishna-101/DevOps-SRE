@@ -8,7 +8,7 @@ resources:
   - role.yaml
   - resourcequota.yaml
   - networkpolicy.yaml
-  - deployment-latest.yaml
-  - deployment-previous.yaml
-  - deployment-old.yaml
+  - deployment_latest.yaml
+  - deployment_previous.yaml
+  - deployment_old.yaml
   - service.yaml
