@@ -28,7 +28,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: preflight
-          image: ghcr.io/shishir-krishna-101/devops-sre:351b478ef9575977b17b63f1bc386a360231de1a
+          image: busybox:1.36.1
           command: ["sh", "-c", "test -d /tmp"]
           securityContext:
             allowPrivilegeEscalation: false
