@@ -65,7 +65,6 @@ jobs:
         run: |
           git switch -c "$GITOPS_BRANCH"
 
-          # Get only the image of the devops-sre application container.
           get_app_image() {
             awk '
               /^[[:space:]]*- name: devops-sre[[:space:]]*$/ {
@@ -85,7 +84,6 @@ jobs:
             ' "$1"
           }
 
-          # Update ONLY the image belonging to the devops-sre container.
           set_app_image() {
             file="$1"
             new_image="$2"
@@ -117,12 +115,10 @@ jobs:
             mv "$file.tmp" "$file"
           }
 
-          # Read the CURRENT application images BEFORE changing anything.
           LATEST_IMAGE=$(get_app_image k8s/deployment_latest.yaml)
           PREVIOUS_IMAGE=$(get_app_image k8s/deployment_previous.yaml)
           OLD_IMAGE=$(get_app_image k8s/deployment_old.yaml)
 
-          # Fail if any application image cannot be found.
           if [ -z "$LATEST_IMAGE" ]; then
             echo "ERROR: Could not find devops-sre image in deployment_latest.yaml"
             exit 1
@@ -148,13 +144,6 @@ jobs:
           echo "old      : $OLD_IMAGE"
           echo "new      : $NEW_IMAGE"
 
-          # Rotate ONLY application images:
-          #
-          # old      <- previous
-          # previous <- latest
-          # latest   <- new
-          #
-
           set_app_image k8s/deployment_old.yaml "$PREVIOUS_IMAGE"
           set_app_image k8s/deployment_previous.yaml "$LATEST_IMAGE"
           set_app_image k8s/deployment_latest.yaml "$NEW_IMAGE"
@@ -169,7 +158,7 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo "VERIFY YAML IMAGES"
+          echo "VERIFY ALL IMAGE REFERENCES"
           echo "========================================"
 
           grep -n "image:" \
