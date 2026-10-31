@@ -5,5 +5,5 @@ __pycache__/
 .pytest_cache/
 argocd/readme.md
 scripts/deploy-local.sh
-monitoring/*
+monitoring/readme.md
 cmd.md
