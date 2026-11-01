@@ -1,0 +1,61 @@
+alloy:
+  configMap:
+    content: |
+      logging {
+        level  = "info"
+        format = "logfmt"
+      }
+
+      discovery.kubernetes "pods" {
+        role = "pod"
+      }
+
+      discovery.kubernetes "nodes" {
+        role = "node"
+      }
+
+      discovery.kubernetes "services" {
+        role = "service"
+      }
+
+      discovery.kubernetes "endpoints" {
+        role = "endpoints"
+      }
+
+      discovery.kubernetes "endpointslices" {
+        role = "endpointslice"
+      }
+
+      discovery.kubernetes "ingresses" {
+        role = "ingress"
+      }
+
+      discovery.relabel "pod_logs" {
+        targets = discovery.kubernetes.pods.targets
+
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_name"]
+          target_label  = "container"
+        }
+      }
+
+      loki.source.kubernetes "pod_logs" {
+        targets    = discovery.relabel.pod_logs.output
+        forward_to = [loki.write.default.receiver]
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki.logging.svc.cluster.local:3100/loki/api/v1/push"
+        }
+      }

@@ -1,0 +1,38 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: devops-sre-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: devops-sre-alerts
+      rules:
+        - alert: DevOpsSREReplicasUnavailable
+          expr: |
+            sum(
+              kube_deployment_status_replicas_available{
+                namespace="devops-sre",
+                deployment=~"devops-sre-v[123]"
+              }
+            ) < 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "DevOps SRE application has no available replicas"
+            description: "All devops-sre application version deployments have zero available replicas for more than 1 minute."
+
+        - alert: DevOpsSREContainerOOMKilled
+          expr: |
+            kube_pod_container_status_last_terminated_reason{
+              namespace="devops-sre",
+              reason="OOMKilled"
+            } == 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "DevOps SRE container was OOMKilled"
+            description: "A container in the devops-sre namespace was terminated because it exceeded its memory limit."
